@@ -164,30 +164,44 @@ const VendorList = () => {
     }
   };
 
-  const getImageUrl = (image) => {
-    if (!image) return 'https://images.pexels.com/photos/68389/pexels-photo-68389.jpeg?auto=compress&cs=tinysrgb&w=600';
+  const getImageUrl = (vendor) => {
+    if (!vendor) return null;
     
-    if (typeof image === 'string') {
-      if (image.startsWith('http')) return image;
-      if (image.startsWith('/uploads/')) {
-        // Clean up the URL by removing any HTML attributes or query parameters
-        const cleanPath = image.split('"')[0].split('?')[0];
-        return `${import.meta.env.VITE_API_URL}${cleanPath}`;
+    console.log('Processing vendor image:', {
+      vendorId: vendor._id,
+      vendorName: vendor.name,
+      profileImage: vendor.profileImage,
+      images: vendor.images
+    });
+    
+    // First try to get the profile image
+    if (vendor.profileImage) {
+      console.log('Found profile image:', vendor.profileImage);
+      
+      // If it's already a full URL, return it
+      if (vendor.profileImage.startsWith('http')) {
+        return vendor.profileImage;
       }
-      return image;
+      
+      // Clean up the URL by removing any HTML attributes or query parameters
+      const cleanPath = vendor.profileImage.split('"')[0].split('?')[0];
+      console.log('Cleaned profile image path:', cleanPath);
+      
+      // If it's a relative path starting with /uploads/, construct the full URL
+      if (cleanPath.startsWith('/uploads/')) {
+        const fullUrl = `http://localhost:5001${cleanPath}`;
+        console.log('Constructed full URL:', fullUrl);
+        return fullUrl;
+      }
+      
+      // Otherwise, assume it's just a filename and construct the full URL
+      const fullUrl = `http://localhost:5001/uploads/${cleanPath}`;
+      console.log('Constructed full URL from filename:', fullUrl);
+      return fullUrl;
     }
     
-    if (image.url) {
-      if (image.url.startsWith('http')) return image.url;
-      if (image.url.startsWith('/uploads/')) {
-        // Clean up the URL by removing any HTML attributes or query parameters
-        const cleanPath = image.url.split('"')[0].split('?')[0];
-        return `${import.meta.env.VITE_API_URL}${cleanPath}`;
-      }
-      return image.url;
-    }
-    
-    return 'https://images.pexels.com/photos/68389/pexels-photo-68389.jpeg?auto=compress&cs=tinysrgb&w=600';
+    // If no profile image, use the default Logo.jpg
+    return 'http://localhost:5001/uploads/Logo.jpg';
   };
 
   if (vendorsError) {
@@ -543,7 +557,7 @@ const VendorList = () => {
                           <CardMedia
                             component="img"
                             height="220"
-                            image={getImageUrl(vendor.images?.[0])}
+                            image={vendor.profileImage ? `http://localhost:5001${vendor.profileImage}` : 'http://localhost:5001/uploads/Logo.jpg'}
                             alt={vendor.name || 'Vendor Image'}
                             sx={{ 
                               transition: 'transform 0.5s ease',

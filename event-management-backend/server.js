@@ -161,7 +161,8 @@ app.post("/register", async (req, res) => {
         email: email,
         phone: phone,
         address: "",
-        website: ""
+        website: "",
+        profileImage: "Logo.jpg" // Set default profile image
       });
       
       await newVendor.save();
@@ -381,10 +382,64 @@ app.get('/vendors', async (req, res) => {
   try {
     const vendors = await Vendor.find();
     
-    // Log the vendors for debugging
-    console.log("Found vendors:", vendors);
+    // Transform vendors to include full URLs for images
+    const transformedVendors = vendors.map(vendor => {
+      const vendorObj = vendor.toObject();
+      
+      console.log('Processing vendor:', {
+        id: vendorObj._id,
+        name: vendorObj.name,
+        originalProfileImage: vendorObj.profileImage
+      });
+      
+      // Add full URL for profile image if it exists
+      if (vendorObj.profileImage) {
+        // Clean up the URL by removing any HTML attributes or query parameters
+        const cleanPath = vendorObj.profileImage.split('"')[0].split('?')[0];
+        // Ensure the path starts with /uploads/
+        vendorObj.profileImage = cleanPath.startsWith('/uploads/') ? cleanPath : `/uploads/${cleanPath}`;
+        
+        console.log('Processed profile image:', {
+          vendorId: vendorObj._id,
+          originalPath: cleanPath,
+          finalUrl: vendorObj.profileImage
+        });
+      } else {
+        // Set default profile image
+        vendorObj.profileImage = '/uploads/Logo.jpg';
+      }
+      
+      // Add full URLs for other images if they exist
+      if (vendorObj.images && vendorObj.images.length > 0) {
+        vendorObj.images = vendorObj.images.map(image => {
+          if (typeof image === 'string') {
+            const cleanPath = image.split('"')[0].split('?')[0];
+            return `/uploads/${cleanPath}`;
+          }
+          if (image.url) {
+            const cleanPath = image.url.split('"')[0].split('?')[0];
+            return {
+              ...image,
+              url: `/uploads/${cleanPath}`
+            };
+          }
+          return image;
+        });
+      }
+      
+      return vendorObj;
+    });
     
-    res.json(vendors);
+    // Log the vendors for debugging
+    console.log("Found vendors with transformed images:", 
+      transformedVendors.map(v => ({
+        id: v._id,
+        name: v.name,
+        profileImage: v.profileImage
+      }))
+    );
+    
+    res.json(transformedVendors);
   } catch (error) {
     console.error("Error fetching vendors:", error);
     res.status(500).json({ message: "Error fetching vendors", error: error.message });
@@ -457,7 +512,7 @@ app.get('/vendors/:id', async (req, res) => {
 
 app.put('/vendors/profile', auth, async (req, res) => {
   try {
-    const { name, ownerName, email, phone, address, description, website } = req.body;
+    const { name, ownerName, email, phone, address, description, website, category } = req.body;
     
     let vendor = await Vendor.findOne({ userId: req.user.id });
     
@@ -472,6 +527,7 @@ app.put('/vendors/profile', auth, async (req, res) => {
     vendor.address = address || vendor.address;
     vendor.description = description || vendor.description;
     vendor.website = website || vendor.website;
+    if (category) vendor.category = category;
     
     await vendor.save();
     
@@ -489,28 +545,60 @@ app.put('/vendors/profile/image', auth, upload.single('profileImage'), async (re
       return res.status(400).json({ message: "No image file provided" });
     }
 
+    console.log('Processing profile image upload:', {
+      userId: req.user.id,
+      file: {
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+      }
+    });
+
     let vendor = await Vendor.findOne({ userId: req.user.id });
     
     if (!vendor) {
       return res.status(404).json({ message: "Vendor profile not found" });
     }
 
-    // Update the profile image
+    console.log('Found vendor:', {
+      vendorId: vendor._id,
+      currentProfileImage: vendor.profileImage
+    });
+
+    // Delete old profile image if it exists
+    if (vendor.profileImage) {
+      const oldImagePath = path.join(__dirname, 'uploads', vendor.profileImage);
+      console.log('Attempting to delete old profile image:', oldImagePath);
+      
+      if (fs.existsSync(oldImagePath)) {
+        try {
+          fs.unlinkSync(oldImagePath);
+          console.log('Successfully deleted old profile image');
+        } catch (err) {
+          console.error('Error deleting old profile image:', err);
+        }
+      } else {
+        console.log('Old profile image file not found');
+      }
+    }
+
+    // Update the profile image with just the filename
     vendor.profileImage = req.file.filename;
     await vendor.save();
     
-    // Construct the full URL
-    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${vendor.profileImage}`;
+    // Construct the image URL
+    const imageUrl = `/uploads/${req.file.filename}`;
     
-    console.log('Updated vendor profile image:', {
-      filename: req.file.filename,
-      path: `/uploads/${req.file.filename}`,
-      fullUrl: imageUrl
+    console.log('Updated vendor profile:', {
+      vendorId: vendor._id,
+      newFilename: req.file.filename,
+      imageUrl: imageUrl
     });
     
     res.json({ 
       message: "Profile image updated successfully",
-      profileImage: vendor.profileImage,
+      profileImage: req.file.filename,
       imageUrl: imageUrl
     });
   } catch (error) {
@@ -548,6 +636,12 @@ app.post("/products", auth, upload.array('images', 5), async (req, res) => {
       });
     }
 
+    // Get category details
+    const categoryDoc = await Category.findById(category);
+    if (!categoryDoc) {
+      return res.status(400).json({ message: "Invalid category" });
+    }
+
     // Process images if any
     const images = req.files && req.files.length > 0 
       ? req.files.map(file => ({
@@ -569,7 +663,7 @@ app.post("/products", auth, upload.array('images', 5), async (req, res) => {
       name,
       description,
       price: Number(price),
-      category,
+      category: categoryDoc.name, // Use the category name from the document
       features: features ? JSON.parse(features) : [],
       images,
       isAvailable: isAvailable === 'true'

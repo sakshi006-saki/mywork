@@ -77,6 +77,7 @@ const Dashboard = () => {
     isAvailable: true
   });
   const [error, setError] = useState(null);
+  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     if (!authLoading) {
@@ -92,6 +93,20 @@ const Dashboard = () => {
       fetchRecentBookings();
     }
   }, [authLoading, user, navigate]);
+
+  useEffect(() => {
+    // Fetch categories from the API
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get('/categories');
+        setCategories(response.data);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -302,7 +317,6 @@ const Dashboard = () => {
                           <TableCell>Price</TableCell>
                           <TableCell>Category</TableCell>
                           <TableCell>Status</TableCell>
-                          <TableCell>Actions</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -318,14 +332,7 @@ const Dashboard = () => {
                                 size="small" 
                               />
                             </TableCell>
-                            <TableCell>
-                              <IconButton size="small" color="primary">
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton size="small" color="error">
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </TableCell>
+                          
                           </TableRow>
                         ))}
                       </TableBody>
@@ -513,11 +520,11 @@ const Dashboard = () => {
                   label="Category"
                   onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
                 >
-                  <MenuItem value="Venue">Venue</MenuItem>
-                  <MenuItem value="Catering">Catering</MenuItem>
-                  <MenuItem value="Decoration">Decoration</MenuItem>
-                  <MenuItem value="Photography">Photography</MenuItem>
-                  <MenuItem value="Entertainment">Entertainment</MenuItem>
+                  {categories.map((category) => (
+                    <MenuItem key={category._id} value={category._id}>
+                      {category.icon} {category.name}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
               <TextField

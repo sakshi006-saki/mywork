@@ -159,13 +159,8 @@ const Navbar = () => {
                   horizontal: 'right',
                 }}
               >
-                <MenuItem 
-                  component={Link} 
-                  to="/profile" 
-                  onClick={handleMenuClose}
-                >
-                  Profile
-                </MenuItem>
+               
+               
                 {user.role === 'vendor' && (
                   <MenuItem 
                     component={Link} 

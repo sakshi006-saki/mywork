@@ -13,6 +13,10 @@ import {
   Alert,
   Snackbar,
   CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -29,6 +33,7 @@ const Profile = () => {
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [categories, setCategories] = useState([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [formData, setFormData] = useState({
     businessName: '',
@@ -38,8 +43,24 @@ const Profile = () => {
     address: '',
     description: '',
     website: '',
-    profileImage: null
+    profileImage: null,
+    category: ''
   });
+
+  useEffect(() => {
+    // Fetch categories from the API
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get('/categories');
+        setCategories(response.data);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+        setError('Failed to load categories');
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     // Fetch vendor profile data from the API
@@ -69,7 +90,8 @@ const Profile = () => {
             address: response.data.address || '',
             description: response.data.description || '',
             website: response.data.website || '',
-            profileImage: profileImage
+            profileImage: profileImage,
+            category: response.data.category || ''
           });
         }
       } catch (err) {
@@ -109,6 +131,7 @@ const Profile = () => {
         address: formData.address,
         description: formData.description,
         website: formData.website,
+        category: formData.category
       });
       
       setEditing(false);
@@ -332,6 +355,27 @@ const Profile = () => {
                       disabled={!editing || loading}
                       variant={editing ? 'outlined' : 'filled'}
                     />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <FormControl 
+                      fullWidth 
+                      disabled={!editing || loading}
+                      variant={editing ? 'outlined' : 'filled'}
+                    >
+                      <InputLabel>Category</InputLabel>
+                      <Select
+                        name="category"
+                        value={formData.category}
+                        onChange={handleInputChange}
+                        label="Category"
+                      >
+                        {categories.map((category) => (
+                          <MenuItem key={category._id} value={category.name}>
+                            {category.icon} {category.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   </Grid>
                   <Grid item xs={12}>
                     <TextField

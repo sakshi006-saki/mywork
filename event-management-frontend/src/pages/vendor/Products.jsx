@@ -40,13 +40,6 @@ import ImageUpload from '../../components/common/ImageUpload';
 import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 
-const categories = [
-  'Decoration',
-  'Catering',
-  'Lighting',
-  'Event Halls',
-];
-
 const ProductCard = ({ product, onEdit, onDelete }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -66,8 +59,18 @@ const ProductCard = ({ product, onEdit, onDelete }) => {
         <CardMedia
           component="img"
           height="200"
-          image={product.images[currentImageIndex]?.url || 'https://source.unsplash.com/random/400x300?event'}
+          image={
+            product.images && product.images.length > 0
+              ? product.images[currentImageIndex].startsWith('http')
+                ? product.images[currentImageIndex]
+                : `http://localhost:5001${product.images[currentImageIndex]}`
+              : 'https://via.placeholder.com/400x300?text=No+Image'
+          }
           alt={product.name}
+          sx={{
+            objectFit: 'cover',
+            width: '100%'
+          }}
         />
         {product.images.length > 1 && (
           <>
@@ -165,6 +168,7 @@ const Products = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [categories, setCategories] = useState([]);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -189,6 +193,20 @@ const Products = () => {
     productId: null,
     deleting: false
   });
+
+  useEffect(() => {
+    // Fetch categories from the API
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get('/categories');
+        setCategories(response.data);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   // Fetch products on component mount
   useEffect(() => {
@@ -218,8 +236,25 @@ const Products = () => {
       });
       console.log('Products response:', response.data); // Debug log
       
-      // Ensure we always set an array, even if empty
-      setProducts(response.data.products || []);
+      // Transform the products to ensure proper image URLs
+      const transformedProducts = (response.data.products || []).map(product => ({
+        ...product,
+        images: product.images.map(image => {
+          if (typeof image === 'string') {
+            // Remove any duplicate /uploads/ in the path
+            const cleanPath = image.replace(/^\/uploads\//, '');
+            return image.startsWith('http') ? image : `/uploads/${cleanPath}`;
+          }
+          if (image.url) {
+            const cleanPath = image.url.replace(/^\/uploads\//, '');
+            return image.url.startsWith('http') ? image.url : `/uploads/${cleanPath}`;
+          }
+          return null;
+        }).filter(Boolean)
+      }));
+      
+      console.log('Transformed products:', transformedProducts); // Debug log
+      setProducts(transformedProducts);
       setError(null);
     } catch (err) {
       console.error('Error fetching products:', err);
@@ -491,8 +526,8 @@ const Products = () => {
                       })}
                     >
                       {categories.map((category) => (
-                        <MenuItem key={category} value={category}>
-                          {category}
+                        <MenuItem key={category._id} value={category._id}>
+                          {category.icon} {category.name}
                         </MenuItem>
                       ))}
                     </Select>
